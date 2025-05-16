@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      DB_NAME: xtragis
+      DB_SCHEMA: app
+    volumes:
+      - ./database/init:/docker-entrypoint-initdb.d
+      - pg-data:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
+    networks:
+      - backend
+
+volumes:
+  pg-data:
+
+networks:
+  backend:
+    driver: bridge
