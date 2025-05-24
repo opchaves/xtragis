@@ -22,10 +22,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="two"
+        name="track"
         options={{
-          title: 'Tab Two',
-          tabBarIcon: ({ color }) => <TabBarIcon name="map-marked-alt" color={color} />,
+          title: 'Ride',
+          tabBarIcon: ({ color }) => <TabBarIcon name="bike" color={color} />,
         }}
       />
     </Tabs>
