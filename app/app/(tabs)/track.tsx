@@ -8,7 +8,7 @@ export default function Home() {
     <>
       <Stack.Screen options={{ title: 'Ride', headerTitleAlign: 'center' }} />
       <Container>
-        <ScreenContent path="app/(tabs)/two.tsx" title="Ride" />
+        <ScreenContent path="app/(tabs)/track.tsx" title="Ride" />
       </Container>
     </>
   );
