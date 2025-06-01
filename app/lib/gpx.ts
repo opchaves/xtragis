@@ -1,4 +1,4 @@
-import RNFS from 'react-native-fs';
+import * as FileSystem from 'expo-file-system';
 import { LocationPoint } from './types';
 
 export function generateGPX(locations: LocationPoint[], rideName: string) {
@@ -34,13 +34,9 @@ export function generateGPX(locations: LocationPoint[], rideName: string) {
   </gpx>`;
 }
 
-export async function saveGPXFile(
-  locations: LocationPoint[],
-  rideName?: string,
-  filePath?: string
-) {
+export async function saveGPXFile(locations: LocationPoint[], rideName?: string) {
   if (!locations || locations.length === 0) {
-    return new Error('No locations provided to save GPX file.');
+    throw new Error('No locations provided to save GPX file.');
   }
 
   const startDate = new Date(locations[0].timestamp);
@@ -48,20 +44,23 @@ export async function saveGPXFile(
   const gpxContent = generateGPX(locations, rideName);
 
   try {
-    filePath = filePath || `${RNFS.DocumentDirectoryPath}/${rideName}.gpx`;
-    await RNFS.writeFile(filePath, gpxContent, 'utf8');
+    const filePath = `${FileSystem.documentDirectory}${rideName}.gpx`;
+    await FileSystem.writeAsStringAsync(filePath, gpxContent);
     console.log(`GPX file saved to ${filePath}`);
+    return filePath;
   } catch (error) {
-    return error as Error;
+    console.error('Error saving GPX file:', error);
+    // TODO: throw app error types
+    throw error;
   }
 }
 
-function newName(date: Date): string {
+export function newName(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   const hours = String(date.getHours()).padStart(2, '0');
   const minutes = String(date.getMinutes()).padStart(2, '0');
   const seconds = String(date.getSeconds()).padStart(2, '0');
-  return `Ride-${year}-${month}-${day}-${hours}-${minutes}-${seconds}`;
+  return `ride-${year}-${month}-${day}-${hours}-${minutes}-${seconds}`;
 }

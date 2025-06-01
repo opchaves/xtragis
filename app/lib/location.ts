@@ -1,6 +1,7 @@
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
-import RNFS from 'react-native-fs';
+import * as FileSystem from 'expo-file-system';
+import { LocationPoint } from './types';
 
 export const BACKGROUND_TRACKINT_TASK = 'background-tracking-task';
 
@@ -12,25 +13,24 @@ TaskManager.defineTask(BACKGROUND_TRACKINT_TASK, async ({ data, error }) => {
 
   // TODO: create type for `data`
   const { locations } = data as any;
-  const tmpPath = `${RNFS.DocumentDirectoryPath}/temp_locations.json`;
+  const tmpPath = `${FileSystem.documentDirectory}/temp_locations.json`;
   try {
-    const content = await RNFS.readFile(tmpPath, 'utf8');
+    const content = await FileSystem.readAsStringAsync(tmpPath);
     const existing = content ? JSON.parse(content) : [];
-    // TODO: create `loc` type
     const newLocations = locations.map((loc: any) => ({
       latitude: loc.coords.latitude,
       longitude: loc.coords.longitude,
-      // TODO: make sure timestamp is being set
-      // timestamp: loc.timestamp,
+      timestamp: loc.timestamp,
     }));
-    await RNFS.writeFile(tmpPath, JSON.stringify([...existing, ...newLocations]), 'utf8');
+    const contents = JSON.stringify([...existing, ...newLocations]);
+    await FileSystem.writeAsStringAsync(tmpPath, contents);
   } catch {
     const newLocations = locations.map((loc: any) => ({
       latitude: loc.coords.latitude,
       longitude: loc.coords.longitude,
-      // timestamp: loc.timestamp,
+      timestamp: loc.timestamp,
     }));
-    await RNFS.writeFile(tmpPath, JSON.stringify(newLocations), 'utf8');
+    await FileSystem.writeAsStringAsync(tmpPath, JSON.stringify(newLocations));
   }
 });
 
@@ -43,17 +43,15 @@ export async function requestLocationPermissions() {
   return background.status === 'granted';
 }
 
-export async function startForegroundTracking(
-  calback: (location: Location.LocationObjectCoords) => void
-) {
-  await Location.watchPositionAsync(
+export async function startForegroundTracking(calback: (location: LocationPoint) => void) {
+  return Location.watchPositionAsync(
     {
       accuracy: Location.Accuracy.High,
       timeInterval: 1000, // 1 second
       distanceInterval: 10, // 10 meters
     },
     (loc) => {
-      calback(loc.coords);
+      calback({ ...loc.coords, timestamp: loc.timestamp });
     }
   );
 }
@@ -79,13 +77,16 @@ export async function stopBackgroundTracking() {
 }
 
 export async function getTempLocations() {
-  const tmpPath = `${RNFS.DocumentDirectoryPath}/temp_locations.json`;
+  const tmpPath = `${FileSystem.documentDirectory}/temp_locations.json`;
   try {
-    const content = await RNFS.readFile(tmpPath, 'utf8');
-    const locations = content ? JSON.parse(content) : [];
-    await RNFS.unlink(tmpPath); // Clear the file after reading
-    // TODO: set type after parsing
-    return locations;
+    const fileInfo = await FileSystem.getInfoAsync(tmpPath);
+    if (fileInfo.exists) {
+      const content = await FileSystem.readAsStringAsync(tmpPath);
+      const locations = content ? JSON.parse(content) : [];
+      await FileSystem.deleteAsync(tmpPath, { idempotent: true });
+      return locations;
+    }
+    return [];
   } catch (error) {
     console.error('Error reading temporary locations:', error);
     return [];

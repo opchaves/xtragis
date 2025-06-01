@@ -1,5 +1,6 @@
 import { SQLiteDatabase } from 'expo-sqlite';
 import { runMigrations } from './migrations';
+import { Ride, UploadQueueItem } from './types';
 
 export async function initDB(db: SQLiteDatabase) {
   db.execAsync('PRAGMA journal_mode = WAL;');
@@ -8,56 +9,44 @@ export async function initDB(db: SQLiteDatabase) {
   await runMigrations(db);
 }
 
-export type Ride = {
-  id?: number;
-  name: string;
-  startTime: string;
-  duration: number;
-  gpxPath: string;
-};
-
 export async function saveRideMetadata(db: SQLiteDatabase, args: Ride) {
   const { name, startTime, duration, gpxPath } = args;
 
-  const sqlStmt = await db.prepareAsync(
-    'INSERT INTO rides (name, startTime, duration, gpxPath) VALUES (?, ?, ?, ?)'
+  const res = await db.runAsync(
+    'INSERT INTO rides (name, startTime, duration, gpxPath) VALUES (?, ?, ?, ?)',
+    [name, startTime, duration, gpxPath]
   );
 
-  await db.withTransactionAsync(async () => {
-    await sqlStmt.executeAsync([name, startTime, duration, gpxPath]);
-  });
+  return res.lastInsertRowId;
 }
 
 export async function getRides(db: SQLiteDatabase) {
-  const sqlStmt = await db.prepareAsync('SELECT * FROM rides ORDER BY startTime DESC');
-  const result = await sqlStmt.executeAsync<Ride>();
-  return result;
+  return db.getAllAsync<Ride>('SELECT * FROM rides ORDER BY startTime DESC');
 }
 
 export async function queueForUpload(db: SQLiteDatabase, rideId: number, gpxPath: string) {
-  const sqlStmt = await db.prepareAsync('INSERT INTO upload_queue (rideId, gpxPath) VALUES (?, ?)');
+  const res = await db.runAsync('INSERT INTO upload_queue (rideId, gpxPath) VALUES (?, ?)', [
+    rideId,
+    gpxPath,
+  ]);
+  return res.lastInsertRowId;
+}
 
-  await db.withTransactionAsync(async () => {
-    await sqlStmt.executeAsync([rideId, gpxPath]);
-  });
+export async function getQueuedUploads(db: SQLiteDatabase) {
+  return db.getAllAsync<Required<UploadQueueItem>>('SELECT * FROM upload_queue');
 }
 
 export async function deleteFromQueue(db: SQLiteDatabase, queueId: number) {
-  const sqlStmt = await db.prepareAsync('DELETE FROM upload_queue WHERE id = ?');
-
-  await db.withTransactionAsync(async () => {
-    await sqlStmt.executeAsync([queueId]);
-  });
+  const res = await db.runAsync('DELETE FROM upload_queue WHERE id = ?', [queueId]);
+  return res.changes > 0;
 }
 
 export async function getRideById(db: SQLiteDatabase, rideId: number) {
-  const sqlStmt = await db.prepareAsync('SELECT * FROM rides WHERE id = ?');
-  const result = await sqlStmt.executeAsync<Ride>([rideId]);
-  const ride = await result.getFirstAsync();
+  const ride = await db.getFirstAsync<Ride>(`SELECT * FROM rides WHERE id = ?`, [rideId]);
 
   if (!ride) {
     throw new Error(`Ride with ID ${rideId} not found`);
   }
 
-  return ride;
+  return ride as Required<Ride>;
 }
